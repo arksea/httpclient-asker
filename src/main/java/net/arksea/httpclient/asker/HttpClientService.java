@@ -1,6 +1,7 @@
 package net.arksea.httpclient.asker;
 
 import org.apache.http.Header;
+import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.concurrent.FutureCallback;
 import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
@@ -32,7 +33,7 @@ public class HttpClientService {
      */
     public void ask(final HttpAsk ask, final FutureCallback<HttpResult> callback, int timeout) {
         log.debug("Http Request URI:{}", ask.request.getURI());
-        synchronized (this.getClass()) {
+        synchronized (this) {
             try {
                 if (httpAsyncClient == null) {
                     httpAsyncClient = createAsyncHttpClient();
@@ -40,26 +41,32 @@ public class HttpClientService {
                 httpAsyncClient.execute(ask.request, new FutureCallback<HttpResponse>() {
                     @Override
                     public void completed(HttpResponse response) {
-                        final StringBuilder sb = new StringBuilder();
-                        try {
-                            InputStreamReader reader;
-                            Header h1 = response.getLastHeader("Content-Encoding");
-                            if (h1!=null && "gzip".equals(h1.getValue())) {
-                                reader = new InputStreamReader(
-                                    new GZIPInputStream(response.getEntity().getContent()), "UTF-8");
-                            } else {
-                                reader = new InputStreamReader(response.getEntity().getContent(), "UTF-8");
+                        HttpEntity entity = response.getEntity();
+                        if (entity != null) {
+                            final StringBuilder sb = new StringBuilder();
+                            try {
+                                InputStreamReader reader;
+                                Header h1 = response.getLastHeader("Content-Encoding");
+                                if (h1 != null && "gzip".equals(h1.getValue())) {
+                                    reader = new InputStreamReader(
+                                        new GZIPInputStream(response.getEntity().getContent()), "UTF-8");
+                                } else {
+                                    reader = new InputStreamReader(response.getEntity().getContent(), "UTF-8");
+                                }
+                                char[] cbuf = new char[128];
+                                int len;
+                                while ((len = reader.read(cbuf)) > -1) {
+                                    sb.append(cbuf, 0, len);
+                                }
+                                String data = sb.toString();
+                                log.debug("Http Respond(status={}): {}", response.getStatusLine().getStatusCode(), data);
+                                callback.completed(new HttpResult(ask.tag, data, response));
+                            } catch (Exception ex) {
+                                callback.failed(ex);
                             }
-                            char[] cbuf = new char[128];
-                            int len;
-                            while ((len = reader.read(cbuf)) > -1) {
-                                sb.append(cbuf, 0, len);
-                            }
-                            String data = sb.toString();
-                            log.debug("Http Respond: {}", data);
-                            callback.completed(new HttpResult(ask.tag, data, response));
-                        } catch (Exception ex) {
-                            callback.failed(ex);
+                        } else {
+                            log.debug("Http Respond(status={}): ",response.getStatusLine().getStatusCode());
+                            callback.completed(new HttpResult(ask.tag, "", response));
                         }
                     }
 
@@ -93,6 +100,20 @@ public class HttpClientService {
         CloseableHttpAsyncClient client = httpAsyncClientBuilder.build();
         client.start();
         return client;
+    }
+
+    public void close() {
+        log.debug("HttpClientService.close()");
+        synchronized (this) {
+            try {
+                if (httpAsyncClient!=null) {
+                    httpAsyncClient.close();
+                }
+            } catch (Exception e1) {
+                log.warn(e1);
+            }
+            httpAsyncClient = null;
+        }
     }
 
 }
