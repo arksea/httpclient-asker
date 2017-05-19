@@ -4,7 +4,7 @@ apply plugin: 'maven'
 apply plugin: 'pmd'
 
 group = 'net.arksea'
-String mavenVersion = '1.0.0'
+String mavenVersion = '1.0.1-SNAPSHOT'
 version = mavenVersion
 
 description = """Apache AsyncHttpClient Futured Requester"""
