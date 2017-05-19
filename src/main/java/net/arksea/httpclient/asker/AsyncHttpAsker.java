@@ -1,9 +1,14 @@
 package net.arksea.httpclient.asker;
 
 import akka.actor.ActorRef;
+import akka.actor.Props;
+import akka.actor.Terminated;
 import akka.actor.UntypedActor;
+import akka.japi.Creator;
+import net.arksea.httpclient.HttpClientHelper;
 import org.apache.http.concurrent.FutureCallback;
 import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
+import org.apache.http.impl.nio.client.HttpAsyncClients;
 
 /**
  * 代理对HttpClientService的请求，目的是为了做AsyncHttpClient回调到Future的模式转换
@@ -19,6 +24,22 @@ public class AsyncHttpAsker extends UntypedActor {
         this.askTimeout = askTimeout;
     }
 
+    public static Props props(int socketTimeout,
+                              int maxConnectionTotal,
+                              int maxConnectionPerRoute,
+                              int keepAliveSeconds) {
+        HttpAsyncClientBuilder builder = HttpAsyncClients.custom()
+            .setMaxConnTotal(maxConnectionTotal)
+            .setMaxConnPerRoute(maxConnectionPerRoute)
+            .setKeepAliveStrategy(HttpClientHelper.createKeepAliveStrategy(keepAliveSeconds));
+        return Props.create(AsyncHttpAsker.class, new Creator<AsyncHttpAsker>() {
+            @Override
+            public AsyncHttpAsker create() throws Exception {
+                return new AsyncHttpAsker(builder,socketTimeout);
+            }
+        });
+    }
+
     @Override
     public void onReceive(Object o) throws Throwable {
         if (o instanceof HttpAsk) {
@@ -31,6 +52,11 @@ public class AsyncHttpAsker extends UntypedActor {
         } else {
             unhandled(o);
         }
+    }
+
+    @Override
+    public void postStop() throws Exception {
+        httpClient.close();
     }
 
     private void handleAsk(HttpAsk ask) {
