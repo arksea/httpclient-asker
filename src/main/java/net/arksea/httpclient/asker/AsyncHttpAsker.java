@@ -19,8 +19,8 @@ public class AsyncHttpAsker extends UntypedActor {
     private HttpClientService httpClient;
     private int askTimeout;
 
-    public AsyncHttpAsker(HttpAsyncClientBuilder builder, int askTimeout) {
-        this.httpClient = new HttpClientService(builder);
+    public AsyncHttpAsker(HttpClientService httpClient, int askTimeout) {
+        this.httpClient = httpClient;
         this.askTimeout = askTimeout;
     }
 
@@ -32,10 +32,11 @@ public class AsyncHttpAsker extends UntypedActor {
             .setMaxConnTotal(maxConnectionTotal)
             .setMaxConnPerRoute(maxConnectionPerRoute)
             .setKeepAliveStrategy(HttpClientHelper.createKeepAliveStrategy(keepAliveSeconds));
+        HttpClientService httpClient = new HttpClientService(builder);
         return Props.create(AsyncHttpAsker.class, new Creator<AsyncHttpAsker>() {
             @Override
             public AsyncHttpAsker create() throws Exception {
-                return new AsyncHttpAsker(builder,socketTimeout);
+                return new AsyncHttpAsker(httpClient,socketTimeout);
             }
         });
     }
