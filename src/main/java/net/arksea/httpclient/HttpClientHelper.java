@@ -3,9 +3,11 @@ package net.arksea.httpclient;
 import akka.actor.ActorSelection;
 import akka.actor.ActorSystem;
 import akka.actor.Props;
+import akka.routing.RoundRobinPool;
 import net.arksea.httpclient.asker.AsyncHttpAsker;
 import org.apache.http.HeaderElement;
 import org.apache.http.HttpResponse;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.conn.ConnectionKeepAliveStrategy;
 import org.apache.http.message.BasicHeaderElementIterator;
 import org.apache.http.protocol.HTTP;
@@ -52,6 +54,17 @@ public class HttpClientHelper {
                                                                  int keepAliveSeconds) {
         Props props = AsyncHttpAsker.props(socketTimeout,maxConnectionTotal,maxConnectionPerRoute,keepAliveSeconds);
         system.actorOf(props, askerName);
+        return system.actorSelection("/user/"+askerName);
+    }
+
+    public static ActorSelection createPooledAsker(int poolSize, ActorSystem system, String askerName,
+                                             int socketTimeout,
+                                             int maxConnectionTotal,
+                                             int maxConnectionPerRoute,
+                                             int keepAliveSeconds) {
+        Props props = AsyncHttpAsker.props(socketTimeout,maxConnectionTotal,maxConnectionPerRoute,keepAliveSeconds);
+        RoundRobinPool pool = new RoundRobinPool(poolSize);
+        system.actorOf(pool.props(props), askerName);
         return system.actorSelection("/user/"+askerName);
     }
 }

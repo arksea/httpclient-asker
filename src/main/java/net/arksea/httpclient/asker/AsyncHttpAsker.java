@@ -2,7 +2,6 @@ package net.arksea.httpclient.asker;
 
 import akka.actor.ActorRef;
 import akka.actor.Props;
-import akka.actor.Terminated;
 import akka.actor.UntypedActor;
 import akka.japi.Creator;
 import net.arksea.httpclient.HttpClientHelper;
