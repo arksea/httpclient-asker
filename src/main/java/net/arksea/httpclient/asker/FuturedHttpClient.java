@@ -2,9 +2,9 @@ package net.arksea.httpclient.asker;
 
 import akka.actor.ActorSelection;
 import akka.actor.ActorSystem;
-import akka.actor.Props;
 import akka.dispatch.Mapper;
 import akka.pattern.Patterns;
+import net.arksea.httpclient.HttpClientHelper;
 import scala.concurrent.Future;
 
 import java.util.function.Function;
@@ -16,13 +16,13 @@ import static akka.japi.Util.classTag;
  * Created by xiaohaixing on 2017/5/27.
  */
 public class FuturedHttpClient {
-    ActorSelection httpAsker;
-    ActorSystem system;
-    int socketTimeout;
-    String askerName;
+    private ActorSelection httpAsker;
+    public final ActorSystem system;
+    private int socketTimeout;
     public FuturedHttpClient(ActorSystem system, int socketTimeout) {
         this(system,"defaultHttpClientAsker", socketTimeout,4,2,30);
     }
+
     public FuturedHttpClient(ActorSystem system,
                              String askerName,
                              int socketTimeout,
@@ -31,11 +31,20 @@ public class FuturedHttpClient {
                              int keepAliveSeconds) {
         this.system = system;
         this.socketTimeout = socketTimeout;
-        this.askerName = askerName;
-        Props props = AsyncHttpAsker.props(socketTimeout,maxConnectionTotal,maxConnectionPerRoute,keepAliveSeconds);
-        system.actorOf(props, askerName);
-        httpAsker = system.actorSelection("/user/"+askerName);
+        httpAsker = HttpClientHelper.createAsker(system, askerName, socketTimeout, maxConnectionTotal, maxConnectionPerRoute, keepAliveSeconds);
+    }
 
+    //特殊情况下，一个Actor忙不过来时可以创建多个asker
+    public FuturedHttpClient(int poolSize,
+                             ActorSystem system,
+                             String askerName,
+                             int socketTimeout,
+                             int maxConnectionTotal,
+                             int maxConnectionPerRoute,
+                             int keepAliveSeconds) {
+        this.system = system;
+        this.socketTimeout = socketTimeout;
+        httpAsker = HttpClientHelper.createPooledAsker(poolSize, system, askerName, socketTimeout, maxConnectionTotal, maxConnectionPerRoute, keepAliveSeconds);
     }
 
     public Future<HttpResult> ask(HttpAsk httpAsk) {

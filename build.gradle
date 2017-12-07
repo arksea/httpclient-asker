@@ -4,7 +4,7 @@ apply plugin: 'maven'
 apply plugin: 'pmd'
 
 group = 'net.arksea'
-String mavenVersion = '1.0.1-SNAPSHOT'
+String mavenVersion = '1.0.2-SNAPSHOT'
 version = mavenVersion
 
 description = """Apache AsyncHttpClient Futured Requester"""
@@ -22,20 +22,8 @@ configure(install.repositories.mavenInstaller) {
 
 repositories {
     mavenLocal()
-    maven { url "http://172.17.149.8:8081/nexus/content/groups/public/" }
     maven { url "http://repo.maven.apache.org/maven2" }
 }
-
-uploadArchives {
-    repositories.mavenDeployer {
-        repository(url: "http://172.17.149.8:8081/nexus/content/repositories/releases") {
-            authentication(userName: "admin", password: "admin123")
-        }
-        snapshotRepository(url: "http://172.17.149.8:8081/nexus/content/repositories/snapshots") {
-            authentication(userName: "admin", password: "admin123")
-        }
-    }
-}.dependsOn(assemble)
 
 dependencies {
     compile 'org.apache.logging.log4j:log4j-api:2.5'
