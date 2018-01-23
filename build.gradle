@@ -4,7 +4,7 @@ apply plugin: 'maven'
 apply plugin: 'pmd'
 
 group = 'net.arksea'
-String mavenVersion = '1.0.2-SNAPSHOT'
+String mavenVersion = '1.0.3-SNAPSHOT'
 version = mavenVersion
 
 description = """Apache AsyncHttpClient Futured Requester"""
@@ -57,3 +57,14 @@ pmd {
         'java-unusedcode'
     ]
 }
+
+uploadArchives {
+    repositories.mavenDeployer {
+        repository(url: "http://172.17.149.8:8081/nexus/content/repositories/releases") {
+            authentication(userName: "admin", password: "admin123")
+        }
+        snapshotRepository(url: "http://172.17.149.8:8081/nexus/content/repositories/snapshots") {
+            authentication(userName: "admin", password: "admin123")
+        }
+    }
+}.dependsOn(assemble)

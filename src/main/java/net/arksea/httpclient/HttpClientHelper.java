@@ -1,10 +1,5 @@
 package net.arksea.httpclient;
 
-import akka.actor.ActorSelection;
-import akka.actor.ActorSystem;
-import akka.actor.Props;
-import akka.routing.RoundRobinPool;
-import net.arksea.httpclient.asker.AsyncHttpAsker;
 import org.apache.http.HeaderElement;
 import org.apache.http.HttpResponse;
 import org.apache.http.conn.ConnectionKeepAliveStrategy;
@@ -40,30 +35,5 @@ public class HttpClientHelper {
                 return aliveSeconds * 1000;
             }
         };
-    }
-
-    public static ActorSelection createAsker(ActorSystem system, int socketTimeout) {
-        return createAsker(system,"httpAsker", socketTimeout,4,2,30);
-    }
-
-    public static ActorSelection createAsker(ActorSystem system, String askerName,
-                                                                 int socketTimeout,
-                                                                 int maxConnectionTotal,
-                                                                 int maxConnectionPerRoute,
-                                                                 int keepAliveSeconds) {
-        Props props = AsyncHttpAsker.props(socketTimeout,maxConnectionTotal,maxConnectionPerRoute,keepAliveSeconds);
-        system.actorOf(props, askerName);
-        return system.actorSelection("/user/"+askerName);
-    }
-
-    public static ActorSelection createPooledAsker(int poolSize, ActorSystem system, String askerName,
-                                             int socketTimeout,
-                                             int maxConnectionTotal,
-                                             int maxConnectionPerRoute,
-                                             int keepAliveSeconds) {
-        Props props = AsyncHttpAsker.props(socketTimeout,maxConnectionTotal,maxConnectionPerRoute,keepAliveSeconds);
-        RoundRobinPool pool = new RoundRobinPool(poolSize);
-        system.actorOf(pool.props(props), askerName);
-        return system.actorSelection("/user/"+askerName);
     }
 }

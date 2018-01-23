@@ -5,6 +5,7 @@ import akka.actor.Props;
 import akka.actor.UntypedActor;
 import akka.japi.Creator;
 import net.arksea.httpclient.HttpClientHelper;
+import org.apache.http.client.config.RequestConfig;
 import org.apache.http.concurrent.FutureCallback;
 import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import org.apache.http.impl.nio.client.HttpAsyncClients;
@@ -16,26 +17,37 @@ import org.apache.http.impl.nio.client.HttpAsyncClients;
 public class AsyncHttpAsker extends UntypedActor {
 
     private HttpClientService httpClient;
-    private int askTimeout;
 
-    public AsyncHttpAsker(HttpClientService httpClient, int askTimeout) {
+    public AsyncHttpAsker(HttpClientService httpClient) {
         this.httpClient = httpClient;
-        this.askTimeout = askTimeout;
     }
 
-    public static Props props(int socketTimeout,
-                              int maxConnectionTotal,
+    public static Props props(int maxConnectionTotal,
                               int maxConnectionPerRoute,
                               int keepAliveSeconds) {
+        return props(maxConnectionTotal,maxConnectionPerRoute,keepAliveSeconds, null);
+    }
+
+    public static Props props(int maxConnectionTotal,
+                              int maxConnectionPerRoute,
+                              int keepAliveSeconds,
+                              RequestConfig defaultRequestConfig) {
         HttpAsyncClientBuilder builder = HttpAsyncClients.custom()
             .setMaxConnTotal(maxConnectionTotal)
             .setMaxConnPerRoute(maxConnectionPerRoute)
             .setKeepAliveStrategy(HttpClientHelper.createKeepAliveStrategy(keepAliveSeconds));
+        if (defaultRequestConfig != null) {
+            builder.setDefaultRequestConfig(defaultRequestConfig);
+        }
+        return props(builder);
+    }
+
+    public static Props props(HttpAsyncClientBuilder builder) {
         HttpClientService httpClient = new HttpClientService(builder);
         return Props.create(AsyncHttpAsker.class, new Creator<AsyncHttpAsker>() {
             @Override
             public AsyncHttpAsker create() throws Exception {
-                return new AsyncHttpAsker(httpClient,socketTimeout);
+                return new AsyncHttpAsker(httpClient);
             }
         });
     }
@@ -79,7 +91,7 @@ public class AsyncHttpAsker extends UntypedActor {
                 HttpResult result = new HttpResult(ask.tag, new Exception("request cancelled"), null);
                 requester.tell(new SendToConsumer(result, consumer), ActorRef.noSender());
             }
-        },askTimeout);
+        });
     }
 }
 

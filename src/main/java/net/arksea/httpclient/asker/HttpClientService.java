@@ -31,7 +31,7 @@ public class HttpClientService {
      * @param ask http ask
      * @param callback 回调函数
      */
-    public void ask(final HttpAsk ask, final FutureCallback<HttpResult> callback, int timeout) {
+    public void ask(final HttpAsk ask, final FutureCallback<HttpResult> callback) {
         log.debug("Http Request URI:{}", ask.request.getURI());
         synchronized (this) {
             try {
