@@ -57,10 +57,6 @@ public class AsyncHttpAsker extends UntypedActor {
         if (o instanceof HttpAsk) {
             HttpAsk get = (HttpAsk) o;
             handleAsk(get);
-        } else if (o instanceof SendToConsumer) {
-            SendToConsumer msg = (SendToConsumer) o;
-            //直接转发给消费者
-            msg.consumer.tell(msg.result, self());
         } else {
             unhandled(o);
         }
@@ -77,19 +73,19 @@ public class AsyncHttpAsker extends UntypedActor {
         httpClient.ask(ask, new FutureCallback<HttpResult>() {
             @Override
             public void completed(HttpResult result) {
-                requester.tell(new SendToConsumer(result, consumer), ActorRef.noSender());
+                consumer.tell(result, requester);
             }
 
             @Override
             public void failed(Exception ex) {
                 HttpResult result = new HttpResult(ask.tag, ex, null);
-                requester.tell(new SendToConsumer(result, consumer), ActorRef.noSender());
+                consumer.tell(result, requester);
             }
 
             @Override
             public void cancelled() {
                 HttpResult result = new HttpResult(ask.tag, new Exception("request cancelled"), null);
-                requester.tell(new SendToConsumer(result, consumer), ActorRef.noSender());
+                consumer.tell(result, requester);
             }
         });
     }

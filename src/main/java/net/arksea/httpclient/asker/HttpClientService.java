@@ -9,6 +9,7 @@ import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.util.zip.GZIPInputStream;
 
@@ -42,16 +43,22 @@ public class HttpClientService {
                     @Override
                     public void completed(HttpResponse response) {
                         HttpEntity entity = response.getEntity();
-                        if (entity != null) {
+                        if (entity == null) {
+                             ask.request.abort();
+                            log.debug("Http Respond(status={}): ",response.getStatusLine().getStatusCode());
+                            callback.completed(new HttpResult(ask.tag, "", response));
+                        } else {
                             final StringBuilder sb = new StringBuilder();
+                            InputStream in = null;
+                            InputStreamReader reader = null;
                             try {
-                                InputStreamReader reader;
+                                in = entity.getContent();
                                 Header h1 = response.getLastHeader("Content-Encoding");
                                 if (h1 != null && "gzip".equals(h1.getValue())) {
                                     reader = new InputStreamReader(
-                                        new GZIPInputStream(response.getEntity().getContent()), "UTF-8");
+                                        new GZIPInputStream(in), "UTF-8");
                                 } else {
-                                    reader = new InputStreamReader(response.getEntity().getContent(), "UTF-8");
+                                    reader = new InputStreamReader(in, "UTF-8");
                                 }
                                 char[] cbuf = new char[128];
                                 int len;
@@ -63,20 +70,33 @@ public class HttpClientService {
                                 callback.completed(new HttpResult(ask.tag, data, response));
                             } catch (Exception ex) {
                                 callback.failed(ex);
+                            } finally {
+                                if(reader != null) {
+                                    try {
+                                        reader.close();
+                                    } catch (Exception ex) {
+                                        log.debug("close stream failed",ex);
+                                    }
+                                } else if (in != null) {
+                                    try {
+                                        in.close();
+                                    } catch (Exception ex) {
+                                        log.debug("close stream failed",ex);
+                                    }
+                                }
                             }
-                        } else {
-                            log.debug("Http Respond(status={}): ",response.getStatusLine().getStatusCode());
-                            callback.completed(new HttpResult(ask.tag, "", response));
                         }
                     }
 
                     @Override
                     public void failed(Exception ex) {
+                        ask.request.abort();
                         callback.failed(ex);
                     }
 
                     @Override
                     public void cancelled() {
+                        ask.request.abort();
                         callback.cancelled();
                     }
                 });
@@ -90,6 +110,7 @@ public class HttpClientService {
                 }
                 httpAsyncClient = null;
             } catch (Exception ex) {
+                ask.request.abort();
                 log.warn("HttpAsyncClient请求失败", ex);
                 callback.failed(ex);
             }
