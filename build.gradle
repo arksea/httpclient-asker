@@ -4,7 +4,7 @@ apply plugin: 'maven'
 apply plugin: 'pmd'
 
 group = 'net.arksea'
-String mavenVersion = '1.0.3-SNAPSHOT'
+String mavenVersion = '1.0.4.1-SNAPSHOT'
 version = mavenVersion
 
 description = """Apache AsyncHttpClient Futured Requester"""
@@ -32,11 +32,11 @@ dependencies {
     compile 'org.apache.httpcomponents:httpclient:4.5.1'
     compile 'org.apache.httpcomponents:httpasyncclient:4.0.1'
 
-    compile 'com.typesafe.akka:akka-actor_2.11:2.4.8'
-    compile 'com.typesafe.akka:akka-remote_2.11:2.4.8'
-    compile 'com.typesafe.akka:akka-cluster_2.11:2.4.8'
-    compile 'com.typesafe.akka:akka-slf4j_2.11:2.4.8'
-    compile 'org.scala-lang:scala-library:2.11.8'
+    compile 'com.typesafe.akka:akka-actor_2.12:2.5.11'
+    compile 'com.typesafe.akka:akka-remote_2.12:2.5.11'
+    compile 'com.typesafe.akka:akka-cluster_2.12:2.5.11'
+    compile 'com.typesafe.akka:akka-slf4j_2.12:2.5.11'
+    compile 'org.scala-lang:scala-library:2.12.4'
 }
 
 test.testLogging.showStandardStreams = true

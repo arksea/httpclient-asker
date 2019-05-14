@@ -7,6 +7,7 @@ import akka.dispatch.Mapper;
 import akka.pattern.Patterns;
 import akka.routing.RoundRobinPool;
 import org.apache.http.client.config.RequestConfig;
+import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import scala.concurrent.Future;
 
@@ -43,7 +44,7 @@ public class FuturedHttpClient {
         this.httpAsker = system.actorOf(props,askerName);
     }
 
-    //特殊情况下，一个Actor忙不过来时可以创建多个asker
+    //当设置的maxConnection很大时，可以考虑创建多个asker来处理
     public FuturedHttpClient(int poolSize,
                              ActorSystem system,
                              String askerName,
@@ -54,12 +55,25 @@ public class FuturedHttpClient {
         httpAsker = system.actorOf(pool.props(props), askerName);
     }
 
+    public Future<HttpResult> ask(HttpRequestBase request, Object tag, int askTimeout) {
+        return ask(new HttpAsk(tag, request), askTimeout);
+    }
+
     public Future<HttpResult> ask(HttpAsk httpAsk,int askTimeout) {
         return Patterns.ask(httpAsker,httpAsk, askTimeout).mapTo(classTag(HttpResult.class));
     }
 
+    public Future<HttpResult> ask(HttpRequestBase request, Object tag, int askTimeout, int successCode) {
+        return ask(new HttpAsk(tag, request), askTimeout, successCode);
+    }
+
+    @Deprecated
     public Future<HttpResult> ask(HttpAsk httpAsk, int askTimeout, int successCode) {
         return ask(httpAsk, askTimeout, new int[]{successCode});
+    }
+
+    public Future<HttpResult> ask(HttpRequestBase request, Object tag, int askTimeout, int[] successCodes) {
+        return ask(new HttpAsk(tag, request), askTimeout, successCodes);
     }
 
     /**
@@ -69,6 +83,7 @@ public class FuturedHttpClient {
      * @param successCodes
      * @return
      */
+    @Deprecated
     public Future<HttpResult> ask(HttpAsk req, int askTimeout, int[] successCodes) {
         return Patterns.ask(httpAsker,req, askTimeout).mapTo(classTag(HttpResult.class)).map(mapper(
             (HttpResult ret) -> {
