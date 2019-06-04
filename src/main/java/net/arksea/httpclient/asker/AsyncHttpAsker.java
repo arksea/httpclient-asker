@@ -9,6 +9,7 @@ import org.apache.http.client.config.RequestConfig;
 import org.apache.http.concurrent.FutureCallback;
 import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import org.apache.http.impl.nio.client.HttpAsyncClients;
+import scala.Option;
 
 /**
  * 代理对HttpClientService的请求，目的是为了做AsyncHttpClient回调到Future的模式转换
@@ -65,6 +66,16 @@ public class AsyncHttpAsker extends UntypedActor {
     @Override
     public void postStop() throws Exception {
         httpClient.close();
+    }
+
+    /**
+     * 覆盖Actor.preRestart实现，不调用postStop
+     * 这样在重启时不会关闭httpClient，但退出时将会关闭httpClient
+     * @param reason
+     * @param message
+     */
+    @Override
+    public void preRestart(Throwable reason, Option<Object> message) {
     }
 
     private void handleAsk(HttpAsk ask) {

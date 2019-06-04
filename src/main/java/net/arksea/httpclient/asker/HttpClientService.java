@@ -150,7 +150,6 @@ public class HttpClientService {
     }
 
     private void closeClient(boolean stopService) {
-        log.info("HttpClientService({}) closed", serviceName);
         synchronized (this) {
             if (client !=null) {
                 try {
@@ -158,6 +157,7 @@ public class HttpClientService {
                 } catch (Exception e1) {
                     log.warn(e1);
                 }
+                log.info("HttpClientService({}) closed", serviceName);
             }
             if (stopService) {
                 this.stopped = true;
