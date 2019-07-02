@@ -59,6 +59,7 @@ public class FuturedHttpClient {
         return ask(new HttpAsk(tag, request), askTimeout);
     }
 
+    @Deprecated
     public Future<HttpResult> ask(HttpAsk httpAsk,int askTimeout) {
         return Patterns.ask(httpAsker,httpAsk, askTimeout).mapTo(classTag(HttpResult.class));
     }
@@ -67,6 +68,7 @@ public class FuturedHttpClient {
         return ask(new HttpAsk(tag, request), askTimeout, successCode);
     }
 
+    //将HttpAsk作为内部消息类，外部不再使用，直接传HttpRequestBase参数与tag参数
     @Deprecated
     public Future<HttpResult> ask(HttpAsk httpAsk, int askTimeout, int successCode) {
         return ask(httpAsk, askTimeout, new int[]{successCode});
