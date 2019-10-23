@@ -9,14 +9,18 @@ import org.apache.http.client.config.RequestConfig;
 import org.apache.http.concurrent.FutureCallback;
 import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import org.apache.http.impl.nio.client.HttpAsyncClients;
+import org.apache.logging.log4j.LogManager;
+import org.apache.logging.log4j.Logger;
 import scala.Option;
+
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 代理对HttpClientService的请求，目的是为了做AsyncHttpClient回调到Future的模式转换
  * Created by xiaohaixing on 2017/2/24.
  */
 public class AsyncHttpAsker extends UntypedActor {
-
+    private static final Logger logger = LogManager.getLogger(AsyncHttpAsker.class);
     private HttpClientService httpClient;
 
     public AsyncHttpAsker(HttpClientService httpClient) {
@@ -81,6 +85,9 @@ public class AsyncHttpAsker extends UntypedActor {
     private void handleAsk(HttpAsk ask) {
         final ActorRef consumer = sender();
         final ActorRef requester = self();
+        retryAsk(ask,consumer,requester,ask.retryCount);
+    }
+    private void retryAsk(HttpAsk ask, ActorRef consumer, ActorRef requester, AtomicInteger retryCount) {
         httpClient.ask(ask, new FutureCallback<HttpResult>() {
             @Override
             public void completed(HttpResult result) {
@@ -89,8 +96,14 @@ public class AsyncHttpAsker extends UntypedActor {
 
             @Override
             public void failed(Exception ex) {
-                HttpResult result = new HttpResult(ask.tag, ex, null);
-                consumer.tell(result, requester);
+                int c = retryCount.getAndDecrement();
+                if (c > 0 && !httpClient.isStopped()) {
+                    logger.debug("http ask failed, rest retry count={}",c,ex);
+                    retryAsk(ask, consumer, requester, retryCount);
+                } else {
+                    HttpResult result = new HttpResult(ask.tag, ex, null);
+                    consumer.tell(result, requester);
+                }
             }
 
             @Override

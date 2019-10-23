@@ -23,7 +23,7 @@ public class HttpClientService {
     private volatile CloseableHttpAsyncClient client; //定义为volatile防止DCL出错
     private final HttpAsyncClientBuilder clientBuilder;
     private final String serviceName;
-    private boolean stopped;
+    private volatile boolean stopped;
 
     public HttpClientService(String serviceName, HttpAsyncClientBuilder builder) {
         this.stopped = false;
@@ -37,6 +37,10 @@ public class HttpClientService {
         this.serviceName = "default";
         this.clientBuilder = builder;
         this.client = createAsyncHttpClient();
+    }
+
+    public boolean isStopped() {
+        return stopped;
     }
 
     /**

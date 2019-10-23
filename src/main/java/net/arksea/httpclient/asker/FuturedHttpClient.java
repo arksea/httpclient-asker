@@ -11,6 +11,7 @@ import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import scala.concurrent.Future;
 
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.Function;
 
 import static akka.japi.Util.classTag;
@@ -59,6 +60,10 @@ public class FuturedHttpClient {
         return ask(new HttpAsk(tag, request), askTimeout);
     }
 
+    public Future<HttpResult> ask(HttpRequestBase request, AtomicInteger retryCount, Object tag, int askTimeout) {
+        return ask(new HttpAsk(tag, request, retryCount), askTimeout);
+    }
+
     @Deprecated
     public Future<HttpResult> ask(HttpAsk httpAsk,int askTimeout) {
         return Patterns.ask(httpAsker,httpAsk, askTimeout).mapTo(classTag(HttpResult.class));
@@ -66,6 +71,10 @@ public class FuturedHttpClient {
 
     public Future<HttpResult> ask(HttpRequestBase request, Object tag, int askTimeout, int successCode) {
         return ask(new HttpAsk(tag, request), askTimeout, successCode);
+    }
+
+    public Future<HttpResult> ask(HttpRequestBase request, AtomicInteger retryCount, Object tag, int askTimeout, int successCode) {
+        return ask(new HttpAsk(tag, request, retryCount), askTimeout, successCode);
     }
 
     //将HttpAsk作为内部消息类，外部不再使用，直接传HttpRequestBase参数与tag参数
@@ -76,6 +85,10 @@ public class FuturedHttpClient {
 
     public Future<HttpResult> ask(HttpRequestBase request, Object tag, int askTimeout, int[] successCodes) {
         return ask(new HttpAsk(tag, request), askTimeout, successCodes);
+    }
+
+    public Future<HttpResult> ask(HttpRequestBase request, AtomicInteger retryCount, Object tag, int askTimeout, int[] successCodes) {
+        return ask(new HttpAsk(tag, request,retryCount), askTimeout, successCodes);
     }
 
     /**
@@ -104,7 +117,7 @@ public class FuturedHttpClient {
                         throw new RuntimeException("error code=" + code);
                     }
                 } else {
-                    throw new RuntimeException(ret.error);
+                    throw new RuntimeException(ret.error.getMessage(), ret.error);
                 }
             }), system.dispatcher()
         );
