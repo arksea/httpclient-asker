@@ -6,7 +6,6 @@ import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.concurrent.FutureCallback;
 import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
-import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
@@ -20,23 +19,18 @@ import java.util.zip.GZIPInputStream;
  */
 public class HttpClientService {
     private static final Logger log = LogManager.getLogger(HttpClientService.class);
-    private volatile CloseableHttpAsyncClient client; //定义为volatile防止DCL出错
-    private final HttpAsyncClientBuilder clientBuilder;
+    private final CloseableHttpAsyncClient client; //定义为volatile防止DCL出错
     private final String serviceName;
     private volatile boolean stopped;
 
-    public HttpClientService(String serviceName, HttpAsyncClientBuilder builder) {
+    public HttpClientService(String serviceName, CloseableHttpAsyncClient client) {
         this.stopped = false;
         this.serviceName = serviceName;
-        this.clientBuilder = builder;
-        this.client = createAsyncHttpClient();
+        this.client = client;
     }
 
-    public HttpClientService(HttpAsyncClientBuilder builder) {
-        this.stopped = false;
-        this.serviceName = "default";
-        this.clientBuilder = builder;
-        this.client = createAsyncHttpClient();
+    public HttpClientService(CloseableHttpAsyncClient client) {
+        this("default",client);
     }
 
     public boolean isStopped() {
@@ -55,31 +49,7 @@ public class HttpClientService {
 
     public void ask(final HttpRequestBase request, final Object tag, final FutureCallback<HttpResult> callback) {
         log.debug("Http Request URI:{}", request.getURI());
-        try {
-            if (client == null) {
-                synchronized (this) {
-                    if (client == null) {
-                        if (stopped) { //stoppedx状态用于阻止在close()后才执行的ask调用重新创建client实例
-                            callback.failed(new IllegalStateException("HttpClientService({"+serviceName+"}) is stopped"));
-                            return;
-                        } else {
-                            client = createAsyncHttpClient();
-                        }
-                    }
-                }
-            }
-            doAsk(request, tag, callback);
-        } catch (Exception ex) {
-            //有可能在调用client.execute时抛出IllegalStateException
-            //引起异常的原因有可能是对象已closed、系统或设备异常等造成的非ACTIVE状态
-            //参见  org.apache.http.impl.nio.client.InternalHttpAsyncClient 中对状态的断言处理：
-            /* Asserts.check(status == Status.ACTIVE, "Request cannot be executed; " +
-                     "I/O reactor status: %s", status);
-            */
-            callback.failed(ex);
-            closeClient(false);
-            log.warn("HttpClientService({})状态异常, 将重新创建", serviceName, ex);
-        }
+        doAsk(request, tag, callback);
     }
 
     private void doAsk(final HttpRequestBase request, final Object tag, final FutureCallback<HttpResult> callback) {
@@ -146,13 +116,6 @@ public class HttpClientService {
         });
     }
 
-    private CloseableHttpAsyncClient createAsyncHttpClient() {
-        CloseableHttpAsyncClient client = clientBuilder.build();
-        client.start();
-        log.info("HttpClientService({}) started", serviceName);
-        return client;
-    }
-
     private void closeClient(boolean stopService) {
         synchronized (this) {
             if (client !=null) {
@@ -166,7 +129,6 @@ public class HttpClientService {
             if (stopService) {
                 this.stopped = true;
             }
-            client = null;
         }
     }
 

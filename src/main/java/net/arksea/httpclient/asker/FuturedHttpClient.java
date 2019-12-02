@@ -8,7 +8,7 @@ import akka.pattern.Patterns;
 import akka.routing.RoundRobinPool;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpRequestBase;
-import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
+import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
 import scala.concurrent.Future;
 
 import java.util.concurrent.atomic.AtomicInteger;
@@ -39,9 +39,9 @@ public class FuturedHttpClient {
         this.httpAsker = system.actorOf(props,"defaultHttpClientAsker");
     }
 
-    public FuturedHttpClient(ActorSystem system,String askerName,HttpAsyncClientBuilder builder) {
+    public FuturedHttpClient(ActorSystem system, String askerName, CloseableHttpAsyncClient client) {
         this.system = system;
-        Props props = AsyncHttpAsker.props(builder);
+        Props props = AsyncHttpAsker.props(client);
         this.httpAsker = system.actorOf(props,askerName);
     }
 
@@ -49,9 +49,9 @@ public class FuturedHttpClient {
     public FuturedHttpClient(int poolSize,
                              ActorSystem system,
                              String askerName,
-                             HttpAsyncClientBuilder builder) {
+                             CloseableHttpAsyncClient client) {
         this.system = system;
-        Props props = AsyncHttpAsker.props(builder);
+        Props props = AsyncHttpAsker.props(client);
         RoundRobinPool pool = new RoundRobinPool(poolSize);
         httpAsker = system.actorOf(pool.props(props), askerName);
     }

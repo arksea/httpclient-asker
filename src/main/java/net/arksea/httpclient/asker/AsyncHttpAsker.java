@@ -7,6 +7,7 @@ import akka.japi.Creator;
 import net.arksea.httpclient.HttpClientHelper;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.concurrent.FutureCallback;
+import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
 import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import org.apache.http.impl.nio.client.HttpAsyncClients;
 import org.apache.logging.log4j.LogManager;
@@ -44,11 +45,11 @@ public class AsyncHttpAsker extends UntypedActor {
         if (defaultRequestConfig != null) {
             builder.setDefaultRequestConfig(defaultRequestConfig);
         }
-        return props(builder);
+        return props(builder.build());
     }
 
-    public static Props props(HttpAsyncClientBuilder builder) {
-        HttpClientService httpClient = new HttpClientService(builder);
+    public static Props props(CloseableHttpAsyncClient client) {
+        HttpClientService httpClient = new HttpClientService(client);
         return Props.create(AsyncHttpAsker.class, new Creator<AsyncHttpAsker>() {
             @Override
             public AsyncHttpAsker create() throws Exception {
@@ -88,6 +89,7 @@ public class AsyncHttpAsker extends UntypedActor {
         retryAsk(ask,consumer,requester,ask.retryCount);
     }
     private void retryAsk(HttpAsk ask, ActorRef consumer, ActorRef requester, AtomicInteger retryCount) {
+        final long start = System.currentTimeMillis();
         httpClient.ask(ask, new FutureCallback<HttpResult>() {
             @Override
             public void completed(HttpResult result) {
@@ -97,8 +99,8 @@ public class AsyncHttpAsker extends UntypedActor {
             @Override
             public void failed(Exception ex) {
                 int c = retryCount.getAndDecrement();
+                logger.debug("http ask failed, rest retry count={},time={}ms",c,System.currentTimeMillis()-start,ex);
                 if (c > 0 && !httpClient.isStopped()) {
-                    logger.debug("http ask failed, rest retry count={}",c,ex);
                     retryAsk(ask, consumer, requester, retryCount);
                 } else {
                     HttpResult result = new HttpResult(ask.tag, ex, null);
