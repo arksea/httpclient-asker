@@ -1,9 +1,10 @@
 package net.arksea.httpclient.asker;
 
+import akka.actor.AbstractActor;
 import akka.actor.ActorRef;
 import akka.actor.Props;
-import akka.actor.UntypedActor;
 import akka.japi.Creator;
+import akka.japi.pf.ReceiveBuilder;
 import net.arksea.httpclient.HttpClientHelper;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.concurrent.FutureCallback;
@@ -20,21 +21,15 @@ import java.util.concurrent.atomic.AtomicInteger;
  * 代理对HttpClientService的请求，目的是为了做AsyncHttpClient回调到Future的模式转换
  * Created by xiaohaixing on 2017/2/24.
  */
-public class AsyncHttpAsker extends UntypedActor {
+public class AsyncHttpAsker extends AbstractActor {
     private static final Logger logger = LogManager.getLogger(AsyncHttpAsker.class);
     private HttpClientService httpClient;
 
-    public AsyncHttpAsker(HttpClientService httpClient) {
+    private AsyncHttpAsker(HttpClientService httpClient) {
         this.httpClient = httpClient;
     }
 
-    public static Props props(int maxConnectionTotal,
-                              int maxConnectionPerRoute,
-                              int keepAliveSeconds) {
-        return props(maxConnectionTotal,maxConnectionPerRoute,keepAliveSeconds, null);
-    }
-
-    public static Props props(int maxConnectionTotal,
+    static Props props(int maxConnectionTotal,
                               int maxConnectionPerRoute,
                               int keepAliveSeconds,
                               RequestConfig defaultRequestConfig) {
@@ -48,39 +43,27 @@ public class AsyncHttpAsker extends UntypedActor {
         return props(builder.build());
     }
 
-    public static Props props(CloseableHttpAsyncClient client) {
+    static Props props(CloseableHttpAsyncClient client) {
         HttpClientService httpClient = new HttpClientService(client);
-        return Props.create(AsyncHttpAsker.class, new Creator<AsyncHttpAsker>() {
-            @Override
-            public AsyncHttpAsker create() throws Exception {
-                return new AsyncHttpAsker(httpClient);
-            }
-        });
+        return Props.create(AsyncHttpAsker.class, (Creator<AsyncHttpAsker>) () -> new AsyncHttpAsker(httpClient));
     }
 
     @Override
-    public void onReceive(Object o) throws Throwable {
-        if (o instanceof HttpAsk) {
-            HttpAsk get = (HttpAsk) o;
-            handleAsk(get);
-        } else {
-            unhandled(o);
-        }
-    }
-
-    @Override
-    public void postStop() throws Exception {
+    public void postStop() {
         httpClient.close();
     }
 
     /**
      * 覆盖Actor.preRestart实现，不调用postStop
      * 这样在重启时不会关闭httpClient，但退出时将会关闭httpClient
-     * @param reason
-     * @param message
      */
     @Override
     public void preRestart(Throwable reason, Option<Object> message) {
+    }
+
+    @Override
+    public Receive createReceive() {
+        return ReceiveBuilder.create().match(HttpAsk.class, this::handleAsk).build();
     }
 
     private void handleAsk(HttpAsk ask) {
@@ -88,12 +71,54 @@ public class AsyncHttpAsker extends UntypedActor {
         final ActorRef requester = self();
         retryAsk(ask,consumer,requester,ask.retryCount);
     }
+
     private void retryAsk(HttpAsk ask, ActorRef consumer, ActorRef requester, AtomicInteger retryCount) {
         final long start = System.currentTimeMillis();
         httpClient.ask(ask, new FutureCallback<HttpResult>() {
             @Override
-            public void completed(HttpResult result) {
-                consumer.tell(result, requester);
+            public void completed(HttpResult ret) {
+                int code = ret.response.getStatusLine().getStatusCode();
+                boolean isRetryCode = false;
+                if (ask.retryCodes != null) {
+                    for (int n : ask.retryCodes) {
+                        if (code == n) {
+                            isRetryCode = true;
+                            break;
+                        }
+                    }
+                }
+                boolean success;
+                if (isRetryCode) {
+                    success = false;
+                } else if (ask.successCodes == null) {
+                    success = true;
+                } else {
+                    success = false;
+                    for (int n : ask.successCodes) {
+                        if (code == n) {
+                            success = true;
+                            break;
+                        }
+                    }
+                }
+                if (success) {
+                    consumer.tell(ret, requester);
+                } else {
+                    Exception ex = new RuntimeException("error code=" + code);
+                    if (isRetryCode) {
+                        int c = retryCount.getAndDecrement();
+                        logger.debug("http ask failed, rest retry count={},time={}ms",c,System.currentTimeMillis()-start,ex);
+                        if (c > 0 && !httpClient.isStopped()) {
+                            retryAsk(ask, consumer, requester, retryCount);
+                        } else {
+                            HttpResult result = new HttpResult(ask.tag, ex, null);
+                            consumer.tell(result, requester);
+                        }
+                    } else {
+                        HttpResult result = new HttpResult(ask.tag, ex, null);
+                        consumer.tell(result, requester);
+                    }
+                }
             }
 
             @Override
