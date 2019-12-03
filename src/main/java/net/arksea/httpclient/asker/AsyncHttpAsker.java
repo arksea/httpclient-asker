@@ -79,18 +79,16 @@ public class AsyncHttpAsker extends AbstractActor {
             public void completed(HttpResult ret) {
                 int code = ret.response.getStatusLine().getStatusCode();
                 boolean isRetryCode = false;
-                if (ask.retryCodes != null) {
-                    for (int n : ask.retryCodes) {
-                        if (code == n) {
-                            isRetryCode = true;
-                            break;
-                        }
+                for (int n : ask.retryCodes) {
+                    if (code == n) {
+                        isRetryCode = true;
+                        break;
                     }
                 }
                 boolean success;
                 if (isRetryCode) {
                     success = false;
-                } else if (ask.successCodes == null) {
+                } else if (ask.successCodes.isEmpty()) {
                     success = true;
                 } else {
                     success = false;
@@ -109,6 +107,9 @@ public class AsyncHttpAsker extends AbstractActor {
                         int c = retryCount.getAndDecrement();
                         logger.debug("http ask failed, rest retry count={},time={}ms",c,System.currentTimeMillis()-start,ex);
                         if (c > 0 && !httpClient.isStopped()) {
+                            if (ask.retryCauseConsumer != null) {
+                                ask.retryCauseConsumer.accept(ex);
+                            }
                             retryAsk(ask, consumer, requester, retryCount);
                         } else {
                             HttpResult result = new HttpResult(ask.tag, ex, null);
@@ -126,6 +127,9 @@ public class AsyncHttpAsker extends AbstractActor {
                 int c = retryCount.getAndDecrement();
                 logger.debug("http ask failed, rest retry count={},time={}ms",c,System.currentTimeMillis()-start,ex);
                 if (c > 0 && !httpClient.isStopped()) {
+                    if (ask.retryCauseConsumer != null) {
+                        ask.retryCauseConsumer.accept(ex);
+                    }
                     retryAsk(ask, consumer, requester, retryCount);
                 } else {
                     HttpResult result = new HttpResult(ask.tag, ex, null);
