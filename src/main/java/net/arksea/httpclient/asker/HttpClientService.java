@@ -19,7 +19,7 @@ import java.util.zip.GZIPInputStream;
  */
 public class HttpClientService {
     private static final Logger log = LogManager.getLogger(HttpClientService.class);
-    private final CloseableHttpAsyncClient client; //定义为volatile防止DCL出错
+    private final CloseableHttpAsyncClient client;
     private final String serviceName;
     private volatile boolean stopped;
 
@@ -116,7 +116,7 @@ public class HttpClientService {
         });
     }
 
-    private void closeClient(boolean stopService) {
+    public void close() {
         synchronized (this) {
             if (client !=null) {
                 try {
@@ -126,14 +126,7 @@ public class HttpClientService {
                 }
                 log.info("HttpClientService({}) closed", serviceName);
             }
-            if (stopService) {
-                this.stopped = true;
-            }
+            this.stopped = true;
         }
     }
-
-    public void close() {
-        closeClient(true);
-    }
-
 }

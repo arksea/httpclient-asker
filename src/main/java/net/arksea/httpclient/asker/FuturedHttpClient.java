@@ -48,12 +48,11 @@ public class FuturedHttpClient {
                              CloseableHttpAsyncClient client) {
         this.system = system;
         Props props = AsyncHttpAsker.props(client);
-        RoundRobinPool pool = new RoundRobinPool(poolSize);
-        httpAsker = system.actorOf(pool.props(props), askerName);
+        Props pooledProps = poolSize>1 ? props.withRouter(new RoundRobinPool(poolSize)) : props;
+        httpAsker = system.actorOf(pooledProps, askerName);
     }
 
     public Future<HttpResult> ask(HttpRequestBase request, int askTimeout) {
-
         return ask(new HttpAsk(request), askTimeout);
     }
 
