@@ -40,7 +40,9 @@ public class AsyncHttpAsker extends AbstractActor {
         if (defaultRequestConfig != null) {
             builder.setDefaultRequestConfig(defaultRequestConfig);
         }
-        return props(builder.build());
+        CloseableHttpAsyncClient client = builder.build();
+        client.start();
+        return props(client);
     }
 
     static Props props(CloseableHttpAsyncClient client) {
