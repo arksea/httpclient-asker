@@ -4,7 +4,7 @@ apply plugin: 'maven'
 apply plugin: 'pmd'
 
 group = 'net.arksea'
-String mavenVersion = '1.1.0-SNAPSHOT'
+String mavenVersion = '1.1.1-SNAPSHOT'
 version = mavenVersion
 
 description = """Apache AsyncHttpClient Futured Requester"""
@@ -22,7 +22,7 @@ configure(install.repositories.mavenInstaller) {
 
 repositories {
     mavenLocal()
-    maven { url "http://repo.maven.apache.org/maven2" }
+    maven { url "https://repo.maven.apache.org/maven2" }
 }
 
 dependencies {

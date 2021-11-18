@@ -16,7 +16,7 @@ import static akka.japi.Util.classTag;
  *
  * Created by xiaohaixing on 2017/5/27.
  */
-public class FuturedHttpClient {
+public class FuturedHttpClient implements IFuturedHttpClient {
     public final ActorRef httpAsker;
     public final ActorSystem system;
 

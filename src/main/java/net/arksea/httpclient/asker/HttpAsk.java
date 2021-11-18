@@ -44,6 +44,12 @@ public class HttpAsk {
         this.successCodes = successCodes;
         this.retryCauseConsumer = retryCauseConsumer;
     }
+    public Object getTag() {
+        return tag;
+    }
+    public HttpRequestBase getRequest() {
+        return request;
+    }
     public static HttpAskBuilder builder(HttpRequestBase request) {
         return new HttpAskBuilder(request);
     }
