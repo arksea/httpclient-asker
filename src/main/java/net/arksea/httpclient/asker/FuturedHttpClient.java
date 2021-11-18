@@ -21,18 +21,20 @@ public class FuturedHttpClient implements IFuturedHttpClient {
     public final ActorSystem system;
 
     public FuturedHttpClient(ActorSystem system) {
-        this(system,4,2,30,
-            RequestConfig.custom().setConnectTimeout(10000).setSocketTimeout(10000).build());
+        this(system,"defaultHttpClientAsker",
+                4,2,30,
+                RequestConfig.custom().setConnectTimeout(10000).setSocketTimeout(10000).build());
     }
 
     public FuturedHttpClient(ActorSystem system,
+                             String askerName,
                              int maxConnectionTotal,
                              int maxConnectionPerRoute,
                              int keepAliveSeconds,
                              RequestConfig defaultRequestConfig) {
         this.system = system;
         Props props = AsyncHttpAsker.props(maxConnectionTotal,maxConnectionPerRoute,keepAliveSeconds,defaultRequestConfig);
-        this.httpAsker = system.actorOf(props,"defaultHttpClientAsker");
+        this.httpAsker = system.actorOf(props,askerName);
     }
 
     public FuturedHttpClient(ActorSystem system, String askerName, CloseableHttpAsyncClient client) {
@@ -41,7 +43,20 @@ public class FuturedHttpClient implements IFuturedHttpClient {
         this.httpAsker = system.actorOf(props,askerName);
     }
 
-    //当设置的maxConnection很大时，可以考虑创建多个asker来处理
+    //当需要并发的连接数较大时很大时，可以考虑创建多个asker来处理
+    public FuturedHttpClient(int poolSize,
+                             ActorSystem system,
+                             String askerName,
+                             int maxConnectionTotal,
+                             int maxConnectionPerRoute,
+                             int keepAliveSeconds,
+                             RequestConfig defaultRequestConfig) {
+        this.system = system;
+        Props props = AsyncHttpAsker.props(maxConnectionTotal,maxConnectionPerRoute,keepAliveSeconds,defaultRequestConfig);
+        Props pooledProps = poolSize>1 ? props.withRouter(new RoundRobinPool(poolSize)) : props;
+        httpAsker = system.actorOf(pooledProps, askerName);
+    }
+
     public FuturedHttpClient(int poolSize,
                              ActorSystem system,
                              String askerName,
