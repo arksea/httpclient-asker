@@ -57,7 +57,7 @@ dependencies {
 }
 
 pmd {
-    toolVersion = '5.1.3'
+    toolVersion = '6.0.0'
     ruleSets = [
         'java-basic',
         'java-braces',
