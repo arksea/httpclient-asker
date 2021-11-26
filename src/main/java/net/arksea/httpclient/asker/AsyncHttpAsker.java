@@ -31,9 +31,9 @@ public class AsyncHttpAsker extends AbstractActor {
                 @Override
                 public void onAsk(String name) {}
                 @Override
-                public void onHandleAsk(String name) {}
+                public void onHandleAsk(String name, long t) {}
                 @Override
-                public void onResponded(String name) {}
+                public void onResponded(String name, long t) {}
             };
         } else {
             this.askStat = askStat;
@@ -66,17 +66,19 @@ public class AsyncHttpAsker extends AbstractActor {
     private void handleAsk(HttpAsk ask) {
         final ActorRef consumer = sender();
         final ActorRef requester = self();
-        askStat.onHandleAsk(askerName);
         retryAsk(ask,consumer,requester,ask.retryCount, true);
     }
 
     private void retryAsk(HttpAsk ask, ActorRef consumer, ActorRef requester, AtomicInteger retryCount, boolean firstAsk) {
         final long start = System.currentTimeMillis();
+        if (firstAsk) {
+            askStat.onHandleAsk(askerName, start - ask.getCreateTime());
+        }
         httpClient.ask(ask, new FutureCallback<HttpResult>() {
             @Override
             public void completed(HttpResult ret) {
                 if (firstAsk) {
-                    askStat.onResponded(askerName);
+                    askStat.onResponded(askerName, System.currentTimeMillis() - ask.getCreateTime());
                 }
                 int code = ret.response.getStatusLine().getStatusCode();
                 boolean isRetryCode = false;
@@ -126,7 +128,7 @@ public class AsyncHttpAsker extends AbstractActor {
             @Override
             public void failed(Exception ex) {
                 if (firstAsk) {
-                    askStat.onResponded(askerName);
+                    askStat.onResponded(askerName, System.currentTimeMillis() - ask.getCreateTime());
                 }
                 int c = retryCount.getAndDecrement();
                 logger.debug("http ask failed, rest retry count={},time={}ms",c,System.currentTimeMillis()-start,ex);
@@ -144,7 +146,7 @@ public class AsyncHttpAsker extends AbstractActor {
             @Override
             public void cancelled() {
                 if (firstAsk) {
-                    askStat.onResponded(askerName);
+                    askStat.onResponded(askerName, System.currentTimeMillis() - ask.getCreateTime());
                 }
                 HttpResult result = new HttpResult(ask.tag, new Exception("request cancelled"), null);
                 consumer.tell(result, requester);

@@ -18,21 +18,12 @@ public class HttpAsk {
     final List<Integer> retryCodes;
     final List<Integer> successCodes;
     final Consumer<Exception> retryCauseConsumer;
+    private final long createTime;
     public HttpAsk(HttpRequestBase request) {
-        this.request = request;
-        this.tag = request;
-        this.retryCount = new AtomicInteger(0);
-        this.retryCodes = new LinkedList<>();
-        this.successCodes = new LinkedList<>();
-        this.retryCauseConsumer = null;
+        this(request, request);
     }
     public HttpAsk(HttpRequestBase request, Object tag) {
-        this.request = request;
-        this.tag = tag;
-        this.retryCount = new AtomicInteger(0);
-        this.retryCodes = new LinkedList<>();
-        this.successCodes = new LinkedList<>();
-        this.retryCauseConsumer = null;
+        this(request, tag, 0, new LinkedList<>(), new LinkedList<>(), null);
     }
     public HttpAsk(HttpRequestBase request, Object tag, int retryCount,
                    List<Integer> retryCodes, List<Integer> successCodes,
@@ -43,6 +34,7 @@ public class HttpAsk {
         this.retryCodes = retryCodes;
         this.successCodes = successCodes;
         this.retryCauseConsumer = retryCauseConsumer;
+        this.createTime = System.currentTimeMillis();
     }
     public Object getTag() {
         return tag;
@@ -52,5 +44,8 @@ public class HttpAsk {
     }
     public static HttpAskBuilder builder(HttpRequestBase request) {
         return new HttpAskBuilder(request);
+    }
+    public long getCreateTime() {
+        return createTime;
     }
 }

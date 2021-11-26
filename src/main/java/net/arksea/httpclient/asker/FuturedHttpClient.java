@@ -81,9 +81,9 @@ public class FuturedHttpClient implements IFuturedHttpClient {
             @Override
             public void onAsk(String askerName) {}
             @Override
-            public void onHandleAsk(String askerName) {}
+            public void onHandleAsk(String askerName, long t) {}
             @Override
-            public void onResponded(String askerName) {}
+            public void onResponded(String askerName, long t) {}
         };
     }
 

@@ -82,11 +82,11 @@ public class HttpClientHelper {
                         try {
                             return Long.parseLong(value) * 1000;
                         } catch (final NumberFormatException ignore) {
-                            return aliveSeconds * 1000;
+                            return aliveSeconds * 1000L;
                         }
                     }
                 }
-                return aliveSeconds * 1000;
+                return aliveSeconds * 1000L;
             }
         };
     }
