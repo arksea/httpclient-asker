@@ -6,35 +6,57 @@ import org.apache.http.HttpResponse;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.concurrent.FutureCallback;
 import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
+import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
+import org.apache.http.impl.nio.client.PoolingClientUtils;
+import org.apache.http.pool.PoolStats;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.util.Optional;
 import java.util.zip.GZIPInputStream;
 
 /**
- *
+ * 工具类，对CloseableHttpAsyncClient调用的简单封装，
+ * 读取返回数据，并转化为String格式的结果
  * Created by xiaohaixing on 2016/12/30.
  */
 public class HttpClientService {
     private static final Logger log = LogManager.getLogger(HttpClientService.class);
     private final CloseableHttpAsyncClient client;
     private final String serviceName;
-    private volatile boolean stopped;
 
+    @Deprecated
     public HttpClientService(String serviceName, CloseableHttpAsyncClient client) {
-        this.stopped = false;
         this.serviceName = serviceName;
         this.client = client;
+        if (!this.client.isRunning()) {
+            client.start();
+        }
     }
 
+    @Deprecated
     public HttpClientService(CloseableHttpAsyncClient client) {
         this("default",client);
     }
 
+    public HttpClientService(String serviceName, HttpAsyncClientBuilder builder) {
+        this.serviceName = serviceName;
+        this.client = builder.build();
+        this.client.start();
+    }
+
+    public HttpClientService(HttpAsyncClientBuilder builder) {
+        this("default",builder);
+    }
+
     public boolean isStopped() {
-        return stopped;
+        return !this.client.isRunning();
+    }
+
+    public Optional<PoolStats> getTotalStats() {
+        return PoolingClientUtils.getTotalStats(this.client);
     }
 
     /**
@@ -126,7 +148,6 @@ public class HttpClientService {
                 }
                 log.info("HttpClientService({}) closed", serviceName);
             }
-            this.stopped = true;
         }
     }
 }

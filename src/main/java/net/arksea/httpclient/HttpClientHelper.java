@@ -1,9 +1,6 @@
 package net.arksea.httpclient;
 
-import org.apache.http.Header;
-import org.apache.http.HeaderElement;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
+import org.apache.http.*;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.conn.ConnectionKeepAliveStrategy;
 import org.apache.http.message.BasicHeaderElementIterator;
@@ -68,25 +65,32 @@ public class HttpClientHelper {
         }
     }
 
+    /**
+     * 使用指定的alive时间代替接口返回值
+     * @param aliveSeconds
+     * @return
+     */
     public static ConnectionKeepAliveStrategy createKeepAliveStrategy(int aliveSeconds) {
         return new ConnectionKeepAliveStrategy() {
             @Override
             public long getKeepAliveDuration(final HttpResponse response, final HttpContext context) {
                 Args.notNull(response, "HTTP response");
-                final BasicHeaderElementIterator it = new BasicHeaderElementIterator(response.headerIterator(HTTP.CONN_KEEP_ALIVE));
+                final HeaderElementIterator it = new BasicHeaderElementIterator(
+                        response.headerIterator(HTTP.CONN_KEEP_ALIVE));
                 while (it.hasNext()) {
                     final HeaderElement he = it.nextElement();
                     final String param = he.getName();
                     final String value = he.getValue();
                     if (value != null && param.equalsIgnoreCase("timeout")) {
                         try {
-                            return Long.parseLong(value) * 1000;
-                        } catch (final NumberFormatException ignore) {
-                            return aliveSeconds * 1000L;
+                            long timeout = Long.parseLong(value) * 1000;
+                            return timeout>0 ? aliveSeconds * 1000L : -1;
+                        } catch(final NumberFormatException ignore) {
+                            return -1;
                         }
                     }
                 }
-                return aliveSeconds * 1000L;
+                return -1;
             }
         };
     }

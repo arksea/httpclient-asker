@@ -3,9 +3,9 @@ package net.arksea.httpclient.asker;
 import akka.actor.ActorRef;
 import akka.actor.ActorSystem;
 import akka.actor.Props;
+import akka.dispatch.OnComplete;
 import akka.pattern.Patterns;
 import akka.routing.RoundRobinPool;
-import net.arksea.httpclient.HttpClientHelper;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpRequestBase;
 import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
@@ -30,32 +30,32 @@ public class FuturedHttpClient implements IFuturedHttpClient {
     public FuturedHttpClient(ActorSystem system) {
         HttpAsyncClientBuilder builder = HttpAsyncClients.custom()
             .setMaxConnTotal(4)
-            .setMaxConnPerRoute(2)
-            .setKeepAliveStrategy(HttpClientHelper.createKeepAliveStrategy(30));
+            .setMaxConnPerRoute(2);
         RequestConfig cfg = RequestConfig.custom().setConnectTimeout(10000).setSocketTimeout(10000).build();
         builder.setDefaultRequestConfig(cfg);
-        CloseableHttpAsyncClient client = builder.build();
-        client.start();
         this.system = system;
         this.askStat = createIdleAskStat();
         this.name = "httpClientAsker-"+ UUID.randomUUID().toString().substring(0,8);
-        Props props = AsyncHttpAsker.props(client, name, askStat);
+        Props props = AsyncHttpAsker.props(name, builder);
         this.httpAsker = system.actorOf(props,name);
     }
 
+    @Deprecated
     public FuturedHttpClient(ActorSystem system, String askerName, CloseableHttpAsyncClient client) {
         this(system, askerName, client, createIdleAskStat());
     }
 
+    @Deprecated
     public FuturedHttpClient(ActorSystem system, String askerName, CloseableHttpAsyncClient client, IAskStat askStat) {
         this.system = system;
         this.askStat = askStat;
         this.name = askerName;
-        Props props = AsyncHttpAsker.props(client, askerName, askStat);
+        Props props = AsyncHttpAsker.props(askerName, client);
         this.httpAsker = system.actorOf(props,askerName);
     }
 
-    //当需要并发的连接数较大时很大时，可以考虑创建多个asker来处理
+    @Deprecated
+    //当需要并发的连接数很大时，可以考虑创建多个asker来处理
     public FuturedHttpClient(int poolSize,
                              ActorSystem system,
                              String askerName,
@@ -63,6 +63,7 @@ public class FuturedHttpClient implements IFuturedHttpClient {
         this(poolSize, system, askerName, client, createIdleAskStat());
     }
 
+    @Deprecated
     public FuturedHttpClient(int poolSize,
                              ActorSystem system,
                              String askerName,
@@ -71,34 +72,66 @@ public class FuturedHttpClient implements IFuturedHttpClient {
         this.system = system;
         this.askStat = askStat;
         this.name = askerName;
-        Props props = AsyncHttpAsker.props(client, askerName, askStat);
+        Props props = AsyncHttpAsker.props(askerName, client);
+        Props pooledProps = poolSize>1 ? props.withRouter(new RoundRobinPool(poolSize)) : props;
+        httpAsker = system.actorOf(pooledProps, askerName);
+    }
+
+
+    public FuturedHttpClient(ActorSystem system, String askerName, HttpAsyncClientBuilder builder) {
+        this(system, askerName, builder, createIdleAskStat());
+    }
+
+    public FuturedHttpClient(ActorSystem system, String askerName, HttpAsyncClientBuilder builder, IAskStat askStat) {
+        this.system = system;
+        this.askStat = askStat;
+        this.name = askerName;
+        Props props = AsyncHttpAsker.props(askerName, builder, askStat);
+        this.httpAsker = system.actorOf(props,askerName);
+    }
+
+    //当需要并发的连接数很大时，可以考虑创建多个asker来处理
+    public FuturedHttpClient(int poolSize,
+                             ActorSystem system,
+                             String askerName,
+                             HttpAsyncClientBuilder builder) {
+        this(poolSize, system, askerName, builder, createIdleAskStat());
+    }
+
+    public FuturedHttpClient(int poolSize,
+                             ActorSystem system,
+                             String askerName,
+                             HttpAsyncClientBuilder builder,
+                             IAskStat askStat) {
+        this.system = system;
+        this.askStat = askStat;
+        this.name = askerName;
+        Props props = AsyncHttpAsker.props(askerName, builder, askStat);
         Props pooledProps = poolSize>1 ? props.withRouter(new RoundRobinPool(poolSize)) : props;
         httpAsker = system.actorOf(pooledProps, askerName);
     }
 
     private static IAskStat createIdleAskStat() {
-        return new IAskStat() {
-            @Override
-            public void onAsk(String askerName) {}
-            @Override
-            public void onHandleAsk(String askerName, long t) {}
-            @Override
-            public void onResponded(String askerName, long t) {}
-        };
+        return new IAskStat() {};
     }
 
     public Future<HttpResult> ask(HttpRequestBase request, int askTimeout) {
-        askStat.onAsk(name);
         return ask(new HttpAsk(request), askTimeout);
     }
 
     public Future<HttpResult> ask(HttpRequestBase request, Object tag, int askTimeout) {
-        askStat.onAsk(name);
         return ask(new HttpAsk(request, tag), askTimeout);
     }
 
     public Future<HttpResult> ask(HttpAsk httpAsk,int askTimeout) {
         askStat.onAsk(name);
-        return Patterns.ask(httpAsker,httpAsk, askTimeout).mapTo(classTag(HttpResult.class));
+        Future<HttpResult> f = Patterns.ask(httpAsker,httpAsk, askTimeout).mapTo(classTag(HttpResult.class));
+        f.onComplete(new OnComplete<HttpResult>() {
+            @Override
+            public void onComplete(Throwable failure, HttpResult success) {
+                askStat.onResponded(name, System.currentTimeMillis() - httpAsk.getCreateTime());
+            }
+        }, system.dispatcher());
+        return f;
     }
 }
