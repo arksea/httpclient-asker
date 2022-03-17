@@ -15,7 +15,6 @@ import scala.concurrent.duration.Duration;
 import scala.concurrent.duration.FiniteDuration;
 
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * 代理对HttpClientService的请求，目的是为了做AsyncHttpClient回调到Future的模式转换
@@ -101,7 +100,7 @@ public class AsyncHttpAsker extends AbstractActor {
         this.askStat.onHandleAsk(askerName, System.currentTimeMillis() - ask.getCreateTime());
         final ActorRef consumer = sender();
         final ActorRef requester = self();
-        retryAsk(ask,consumer,requester,ask.retryCount);
+        retryAsk(ask,consumer,requester);
     }
 
     private void handleOnStat(OnLogStats msg) {
@@ -112,7 +111,7 @@ public class AsyncHttpAsker extends AbstractActor {
         }
     }
 
-    private void retryAsk(HttpAsk ask, ActorRef consumer, ActorRef requester, AtomicInteger retryCount) {
+    private void retryAsk(HttpAsk ask, ActorRef consumer, ActorRef requester) {
         final long start = System.currentTimeMillis();
         httpClient.ask(ask, new FutureCallback<HttpResult>() {
             @Override
@@ -144,13 +143,14 @@ public class AsyncHttpAsker extends AbstractActor {
                 } else {
                     Exception ex = new RuntimeException("error code=" + code);
                     if (isRetryCode) {
-                        int c = retryCount.getAndDecrement();
+                        int c = ask.retryCount.getAndDecrement();
                         logger.debug("http ask failed, rest retry count={},time={}ms",c,System.currentTimeMillis()-start,ex);
                         if (c > 0 && !httpClient.isStopped()) {
                             if (ask.retryCauseConsumer != null) {
                                 ask.retryCauseConsumer.accept(ex);
                             }
-                            retryAsk(ask, consumer, requester, retryCount);
+                            requester.tell(ask, consumer); //重试
+                            //retryAsk(ask, consumer, requester); //用递归的方法会影响Apatch异步链接池的连接释放
                         } else {
                             HttpResult result = new HttpResult(ask.tag, ex, null);
                             consumer.tell(result, requester);
@@ -164,13 +164,14 @@ public class AsyncHttpAsker extends AbstractActor {
 
             @Override
             public void failed(Exception ex) {
-                int c = retryCount.getAndDecrement();
+                int c = ask.retryCount.getAndDecrement();
                 logger.debug("http ask failed, rest retry count={},time={}ms",c,System.currentTimeMillis()-start,ex);
                 if (c > 0 && !httpClient.isStopped()) {
                     if (ask.retryCauseConsumer != null) {
                         ask.retryCauseConsumer.accept(ex);
                     }
-                    retryAsk(ask, consumer, requester, retryCount);
+                    requester.tell(ask, consumer); //重试
+                    //retryAsk(ask, consumer, requester); //用递归的方法会影响Apatch异步链接池的连接释放
                 } else {
                     HttpResult result = new HttpResult(ask.tag, ex, null);
                     consumer.tell(result, requester);
