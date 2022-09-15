@@ -7,7 +7,6 @@ import akka.actor.Props;
 import akka.japi.Creator;
 import akka.japi.pf.ReceiveBuilder;
 import org.apache.http.concurrent.FutureCallback;
-import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
 import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
@@ -35,23 +34,6 @@ public class AsyncHttpAsker extends AbstractActor {
         } else {
             this.askStat = askStat;
         }
-    }
-
-    /**
-     * 不建议使用，应使用props(HttpAsyncClientBuilder builder)代替，
-     * 目的是为了在CloseableHttpAsyncClient出现异常时可以在Actor重启时用builder重新创建。
-     * @param client
-     * @return
-     */
-    @Deprecated
-    static Props props(String askerName, CloseableHttpAsyncClient client) {
-        return props(askerName, client, null);
-    }
-
-    @Deprecated
-    static Props props(String askerName, CloseableHttpAsyncClient client, IAskStat askStat) {
-        HttpClientService httpClient = new HttpClientService(client);
-        return Props.create(AsyncHttpAsker.class, (Creator<AsyncHttpAsker>) () -> new AsyncHttpAsker(askerName, httpClient, askStat));
     }
 
     static Props props(String askerName, HttpAsyncClientBuilder builder) {
@@ -97,7 +79,7 @@ public class AsyncHttpAsker extends AbstractActor {
     }
 
     private void handleAsk(HttpAsk ask) {
-        this.askStat.onHandleAsk(askerName, System.currentTimeMillis() - ask.getCreateTime());
+        this.askStat.onHandleAsk(askerName, ask,System.currentTimeMillis() - ask.getCreateTime());
         final ActorRef consumer = sender();
         final ActorRef requester = self();
         retryAsk(ask,consumer,requester);

@@ -8,7 +8,6 @@ import akka.pattern.Patterns;
 import akka.routing.RoundRobinPool;
 import org.apache.http.client.config.RequestConfig;
 import org.apache.http.client.methods.HttpRequestBase;
-import org.apache.http.impl.nio.client.CloseableHttpAsyncClient;
 import org.apache.http.impl.nio.client.HttpAsyncClientBuilder;
 import org.apache.http.impl.nio.client.HttpAsyncClients;
 import scala.concurrent.Future;
@@ -39,44 +38,6 @@ public class FuturedHttpClient implements IFuturedHttpClient {
         Props props = AsyncHttpAsker.props(name, builder);
         this.httpAsker = system.actorOf(props,name);
     }
-
-    @Deprecated
-    public FuturedHttpClient(ActorSystem system, String askerName, CloseableHttpAsyncClient client) {
-        this(system, askerName, client, createIdleAskStat());
-    }
-
-    @Deprecated
-    public FuturedHttpClient(ActorSystem system, String askerName, CloseableHttpAsyncClient client, IAskStat askStat) {
-        this.system = system;
-        this.askStat = askStat;
-        this.name = askerName;
-        Props props = AsyncHttpAsker.props(askerName, client);
-        this.httpAsker = system.actorOf(props,askerName);
-    }
-
-    @Deprecated
-    //当需要并发的连接数很大时，可以考虑创建多个asker来处理
-    public FuturedHttpClient(int poolSize,
-                             ActorSystem system,
-                             String askerName,
-                             CloseableHttpAsyncClient client) {
-        this(poolSize, system, askerName, client, createIdleAskStat());
-    }
-
-    @Deprecated
-    public FuturedHttpClient(int poolSize,
-                             ActorSystem system,
-                             String askerName,
-                             CloseableHttpAsyncClient client,
-                             IAskStat askStat) {
-        this.system = system;
-        this.askStat = askStat;
-        this.name = askerName;
-        Props props = AsyncHttpAsker.props(askerName, client);
-        Props pooledProps = poolSize>1 ? props.withRouter(new RoundRobinPool(poolSize)) : props;
-        httpAsker = system.actorOf(pooledProps, askerName);
-    }
-
 
     public FuturedHttpClient(ActorSystem system, String askerName, HttpAsyncClientBuilder builder) {
         this(system, askerName, builder, createIdleAskStat());
@@ -124,12 +85,12 @@ public class FuturedHttpClient implements IFuturedHttpClient {
     }
 
     public Future<HttpResult> ask(HttpAsk httpAsk,int askTimeout) {
-        askStat.onAsk(name);
+        askStat.onAsk(name, httpAsk);
         Future<HttpResult> f = Patterns.ask(httpAsker,httpAsk, askTimeout).mapTo(classTag(HttpResult.class));
         f.onComplete(new OnComplete<HttpResult>() {
             @Override
             public void onComplete(Throwable failure, HttpResult success) {
-                askStat.onResponded(name, System.currentTimeMillis() - httpAsk.getCreateTime());
+                askStat.onResponded(name, httpAsk,System.currentTimeMillis() - httpAsk.getCreateTime());
             }
         }, system.dispatcher());
         return f;

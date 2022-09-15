@@ -27,20 +27,6 @@ public class HttpClientService {
     private final CloseableHttpAsyncClient client;
     private final String serviceName;
 
-    @Deprecated
-    public HttpClientService(String serviceName, CloseableHttpAsyncClient client) {
-        this.serviceName = serviceName;
-        this.client = client;
-        if (!this.client.isRunning()) {
-            client.start();
-        }
-    }
-
-    @Deprecated
-    public HttpClientService(CloseableHttpAsyncClient client) {
-        this("default",client);
-    }
-
     public HttpClientService(String serviceName, HttpAsyncClientBuilder builder) {
         this.serviceName = serviceName;
         this.client = builder.build();
